@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dlg.reader.mapper.BookMapper">
+    <update id="updateScore">
+        update book b set evaluation_score = (
+            select ifnull(avg(score),0) from evaluation e where e.book_id = b.book_id and state = 'enable'
+        ),evaluation_quantity = (
+            select ifnull(count(*),0) from evaluation e where e.book_id = b.book_id and state = 'enable'
+        )
+    </update>
+    <select id="selectBookMap" resultType="java.util.LinkedHashMap">
+        select b.book_id bookId,b.book_name bookName , b.sub_title subTitle ,b.author , b.cover , b.description , b.category_id categoryId , b.evaluation_score evaluationScore , b.evaluation_quantity evaluationQuantity , c.category_name categoryName  from book b,category c where b.category_id = c.category_id
+    </select>
+</mapper>

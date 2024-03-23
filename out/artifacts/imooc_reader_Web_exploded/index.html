@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0,user-scalable=no">
+    <title>慕课书评网</title>
+    <!-- 引入样式文件 -->
+    <link rel="stylesheet" href="/assets/vant/index.css"/>
+
+    <!-- 引入 Vue 和 Vant 的 JS 文件 -->
+    <script src="/assets/vue/vue.global.js"></script>
+    <script src="/assets/vant/vant.min.js"></script>
+    <script src="/assets/axios/axios.js"></script>
+    <style>
+        .van-card {
+            height: 160px
+        }
+
+        .van-card__thumb {
+            width: 110px
+        }
+
+    </style>
+</head>
+<body>
+<div id="app">
+    <!--导航栏部分,显示慕课网Logo和登录按钮-->
+    <van-nav-bar @click-right="clickRight">
+        <template #left>
+            <a href="/" style="padding-top: 10px">
+                <img src="/images/logo2.png" style="width: 80px">
+            </a>
+        </template>
+        <template #right>
+            <!-- 根据会员登录状态决定显示昵称还是登录按钮 -->
+            <template v-if="state.isLogin">
+                <img src="/images/user_icon.png" style="height:30px">{{state.member.nickname}}
+            </template>
+            <template v-if="!state.isLogin">
+                <img src="/images/user_icon.png" style="height: 30px">
+                登录
+            </template>
+        </template>
+    </van-nav-bar>
+
+    <van-row>
+        <!-- 分类筛选下拉框 -->
+        <van-col span="12">
+            <van-dropdown-menu>
+                <van-dropdown-item @change="changeCategory()" v-model="state.category" :options="categoryOptions"/>
+            </van-dropdown-menu>
+        </van-col>
+        <!-- 结果排序下拉框 -->
+        <van-col span="12">
+            <van-dropdown-menu>
+                <van-dropdown-item @change="changeOrder()" v-model="state.order" :options="orderOptions"/>
+            </van-dropdown-menu>
+        </van-col>
+    </van-row>
+    <!-- 图书列表,遍历加载bookList数据 -->
+    <template v-for="(item,index) in bookList">
+        <van-card @click="showDetail(index)">
+            <template #title>
+                <div style="font-size: 16px;font-weight: bold">{{item.bookName}}</div>
+                <div style="margin-top:5px;background: #eeeeee;padding: 5px">{{item.author}}</div>
+                <div style="font-size: 16px;margin-top:5px;">{{item.subTitle}}</div>
+                <span style="line-height: 20px;margin-right: 10px">{{item.evaluationScore}}分 {{item.evaluationQuantity}}人已评</span>
+                <van-rate v-model="item.evaluationScore" color="#ffd21e" void-icon="star" readonly
+                          allow-half></van-rate>
+            </template>
+
+            <template #thumb>
+                <img :src="item.cover" style="width:102px;height:136px;">
+            </template>
+        </van-card>
+    </template>
+    <!-- 当前如果不是最后一页,显示"加载更多"按钮 -->
+    <van-button v-show="!state.isLastPage" plain hairline type="primary" block style="margin-bottom:50px"
+                @click="loadMore">点击加载更多...
+    </van-button>
+    <!-- 当前如果是最后一页,则提示"没有其他数据" -->
+    <van-button v-show="state.isLastPage" disabled hairline type="default" block style="margin-bottom:50px">没有其他数据了
+    </van-button>
+</div>
+<script>
+    const main = {
+        data() { //初始数据
+            return {
+                bookList: [{ //图书数据
+                    "bookId": 5,
+                    "bookName": "从 0 开始学爬虫",
+                    "subTitle": "零基础开始到大规模爬虫实战",
+                    "author": "梁睿坤 · 19年资深架构师",
+                    "cover": "/images/5ce256ea00014bc903600480.jpg",
+                    "description": "...",
+                    "categoryId": 2,
+                    "evaluationScore": 4.9,
+                    "evaluationQuantity": 15
+                }, {
+                    "bookId": 25,
+                    "bookName": "网络协议那些事儿",
+                    "subTitle": "前后端通用系列课",
+                    "author": "Oscar · 一线大厂高级软件工程师",
+                    "cover": "/images/5da923d60001a92f05400720.jpg",
+                    "description": "...",
+                    "categoryId": 2,
+                    "evaluationScore": 4.7,
+                    "evaluationQuantity": 15
+                }, {
+                    "bookId": 1,
+                    "bookName": "教你用 Python 进阶量化交易",
+                    "subTitle": "你的量化交易开发第一课",
+                    "author": "袁霄 · 全栈工程师",
+                    "cover": "/images/5c247b0b0001a0a903600480.jpg",
+                    "description": "...",
+                    "categoryId": 1,
+                    "evaluationScore": 4.6,
+                    "evaluationQuantity": 13
+                }] //当前要显示的书籍内容
+                , state: {
+                    category: -1, //技术分类，默认分类选中"所有类别"
+                    order: "quantity", //排序，默认按热度排序
+                    page: 1, //查询页号
+                    isLastPage: false,//是否为最后一页
+                    isLogin: false,//当前页面状态是否已登录
+                    member: {}//当前登录的会员数据
+                }
+                , categoryOptions: [
+                    {text: "所有类别", value: -1}
+                ]
+                , orderOptions: [
+                    {text: "按热度排序", value: "quantity"},
+                    {text: "按分数排序", value: "score"}
+                ]
+            }
+        }
+        , methods: {
+            /*
+             * onchange 当页面状态发生变更后,Ajax重新查询图书数据
+             * isFlush 参数说明是否清空已有图书列表
+             */
+            onchange: function (isFlush) {
+                const objApp = this;
+                const uri = "/api/book/list?page=" + objApp.state.page + "&categoryId=" + objApp.state.category + "&order=" + objApp.state.order;
+                axios.get(uri).then(function(response){
+                    const json = response.data;
+                    if(json.code == "0"){
+                        const list = json.data.page.records;
+                        if(isFlush == true){
+                            objApp.bookList.splice(0, objApp.bookList.length);
+                        }
+                        list.forEach(function(item){
+                            objApp.bookList.push(item);
+                        })
+                        // console.info(list);
+                        objApp.state.page = json.data.page.current;
+                        if(json.data.page.pages == json.data.page.current){
+                            objApp.state.isLastPage = true;
+                        }else{
+                            objApp.state.isLastPage = false;
+                        }
+                    }else{
+                        console.error(json);
+                    }
+                })
+            },
+            //点击"加载更多"按钮时,向服务器查询下一页数据
+            loadMore: function () {
+                //如果当前不是最后一页,则当前页号+1并向服务器发起请求查询下一页数据
+                if (this.state.isLastPage == false) {
+                    this.state.page = this.state.page + 1;
+                    this.onchange();
+                }
+            }
+            //当更改"分类"下拉选项后,清空原有数据进行查询
+            , changeCategory: function () {
+                //页号重置为1
+                this.state.page = 1;
+                //重新查询图书数据
+                this.onchange(true);
+            }
+            //当更改"排序"下拉选项后,清空原有数据进行查询
+            , changeOrder: function () {
+                //页号重置为1
+                this.state.page = 1;
+                //重新查询图书数据
+                this.onchange(true);
+            }
+            //点击右上角"登录"按钮后,跳转至登录页
+            , clickRight: function () {
+                if (!this.state.isLogin) {
+                    window.location.href = "/login.html";
+                }
+            }
+            //点击具体的图书专栏后,跳转到详情页面
+            , showDetail: function (index) {
+                const book = this.bookList[index];
+                window.location.href = "/detail.html?bid=" + book.bookId;
+            }
+        }
+        , mounted() {
+            //页面初始化时执行的操作
+            const objApp = this;
+            this.onchange(true);
+            axios.get("/api/category/list")
+                .then(function(response){
+                    const json = response.data;
+                    if(json.code == "0"){
+                        json.data.list.forEach(function(item){
+                            const option = {};
+                            option.text = item.categoryName;
+                            option.value = item.categoryId;
+                            objApp.categoryOptions.push(option);
+                        })
+                    }else{
+                        console.error(json);
+                    }
+                });
+            const mid = sessionStorage.mid;
+            if(mid != null){
+                axios.get("/api/member/select_by_id?memberId=" + mid)
+                    .then(function(response){
+                        const json = response.data;
+                        if(json.code == "0"){
+                            objApp.state.isLogin = true;
+                            objApp.state.member = json.data.member;
+                        }else{
+                            console.error(json);
+                        }
+                    })
+            }
+        }
+    };
+    const app = Vue.createApp(main);
+    app.use(vant);
+    app.use(vant.Lazyload);
+    app.mount("#app");
+</script>
+
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1.0,user-scalable=no">
+    <title>慕课书评网</title>
+    <!-- 引入样式文件 -->
+    <link rel="stylesheet"
+          href="/assets/vant/index.css"/>
+
+    <!-- 引入 Vue 和 Vant 的 JS 文件 -->
+    <script src="/assets/vue/vue.global.js"></script>
+    <script src="/assets/vant/vant.min.js"></script>
+    <script src="/assets/axios/axios.js"></script>
+</head>
+<body>
+<div id="app">
+    <van-nav-bar right-text="会员注册" @click-right="directRegister">
+        <template #left>
+            <a href="/" style="padding-top: 10px">
+                <img src="/images/logo2.png" style="width: 80px">
+            </a>
+        </template>
+    </van-nav-bar>
+    <h3 style="padding-left:32px">会员登录</h3>
+    <van-form ref="loginForm">
+        <van-cell-group inset>
+            <van-field
+                    v-model="username"
+                    name="用户名"
+                    label="用户名"
+                    autocomplete="off"
+                    placeholder="请输入用户名"
+                    :rules="[{ required: true, message: '请填写用户名' }]"
+            />
+        </van-cell-group>
+        <van-cell-group inset>
+            <van-field
+                    v-model="password"
+                    type="password"
+                    name="密码"
+                    label="密码"
+                    placeholder="请输入密码"
+                    :rules="[{ required: true, message: '请填写密码' }]"
+            />
+        </van-cell-group>
+        <van-cell-group inset>
+            <van-row>
+                <van-col span="16">
+                    <van-field
+                            v-model="verifyCode"
+                            name="verifyCode"
+                            label="验证码"
+                            placeholder="请输入验证码"
+                            autocomplete="off"
+                            :rules="[{ required: true, message: '请填写验证码' }]"
+                    />
+                </van-col>
+                <van-col span="8">
+                    <img id="imgVerifyCode" src="/api/verify_code"
+                         style="width: 100%;height:44px;cursor: pointer" @click="reloadVerifyCode">
+                </van-col>
+            </van-row>
+        </van-cell-group>
+        <div style="margin: 16px;">
+            <van-button round block type="primary" @click="onSubmit('loginForm')">
+                登录
+            </van-button>
+        </div>
+    </van-form>
+</div>
+<script>
+
+    const Main = {
+        data() {
+            return {
+                username: "",
+                password: "",
+                verifyCode: ""
+            }
+        }
+        , methods: {
+            onSubmit: function (formName) {
+                const form = this.$refs[formName];
+                const objApp = this;
+                form.validate().then(function(){
+                    //这里组织表单验证后登录代码
+                    const params = new URLSearchParams();
+                    params.append("username",objApp.username);
+                    params.append("password",objApp.password);
+                    params.append("vc",objApp.verifyCode);
+                    axios.post("/api/member/check_login",params)
+                        .then(function (response){
+                            const json = response.data;
+                            if (json.code == "0"){
+                                sessionStorage.mid = json.data.member.memberId;
+                                window.location = "/index.html";
+                            }else {
+                                objApp.reloadVerifyCode();
+                                vant.Dialog.alert({
+                                    title:"登陆失败",
+                                    message:json.message
+                                })
+                            }
+                        })
+                }).catch(function(e){console.debug("表单验证失败",e)});
+            }
+            , directRegister: function () {
+                window.location.href = '/register.html';
+            }
+            , reloadVerifyCode: function () {
+                document.getElementById("imgVerifyCode").src = "/api/verify_code?ts=" + new Date().getTime();
+            }
+        }
+        , mounted() {
+
+        }
+    };
+    const app = Vue.createApp(Main);
+    app.use(vant);
+    app.use(vant.Lazyload);
+    app.mount("#app");
+</script>
+</body>
+</html>
