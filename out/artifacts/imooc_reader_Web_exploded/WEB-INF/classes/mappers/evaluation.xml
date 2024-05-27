@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.dlg.reader.mapper.EvaluationMapper">
-    <select id="selectByBookId" parameterType="Long" resultType="java.util.LinkedHashMap">
-        select e.*,m.nickname from evaluation e,member m
-            where e.member_id = m.member_id and e.book_id = #{value} and e.state = 'enable' order by e.create_time desc
-    </select>
-</mapper>
